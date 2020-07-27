@@ -2,3 +2,5 @@
 .vscode/*
 efekta_mini_dev_board/blank/ses/Output/*
 efekta_mini_dev_board/s140/ses/Output/*
+*.jlink
+*.emSession
