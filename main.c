@@ -85,13 +85,17 @@ sensor_subscription sensor_subscriptions[] = {
 
 static nrf_saadc_value_t adc_buf[ADC_CHANNELS * ADC_SAMPLES_PER_CHANNEL];
 
+int32_t internal_temp_prev = 0x7FFFFFFF;
+
+int32_t dc_voltage_12_prev = 0x7FFFFFFF;
 int32_t dc_voltage_12 = 0;
+int32_t dc_voltage_3v3_prev = 0x7FFFFFFF;
 int32_t dc_voltage_3v3 = 0;
 
 void update_voltage_attributes_callback(void *p_event_data, uint16_t event_size)
 {
 	set_sensor_value('v', dc_voltage_3v3, false);
-	set_sensor_value('V', dc_voltage_12, false);
+//	set_sensor_value('V', dc_voltage_12, false);
 }
 
 void saadc_event_handler(nrf_drv_saadc_evt_t const *p_event)
@@ -109,12 +113,24 @@ void saadc_event_handler(nrf_drv_saadc_evt_t const *p_event)
 			sums[i] = sums[i] / ADC_SAMPLES_PER_CHANNEL;
 		}
 
-		//dc_voltage_12 = sums[1];
+		if (dc_voltage_12_prev == 0x7FFFFFFF) {
+			dc_voltage_12_prev = sums[1];
+			dc_voltage_12 = sums[1];
+		} else {
+			dc_voltage_12 = (dc_voltage_12_prev + dc_voltage_12_prev + dc_voltage_12_prev + sums[1]) >> 2;
+			dc_voltage_12_prev = dc_voltage_12;
+		}
 
 		if (sums[0] < 0)
 			sums[0] = 0;
 
-		dc_voltage_3v3 = sums[0];
+		if (dc_voltage_3v3_prev == 0x7FFFFFFF) {
+			dc_voltage_3v3_prev = sums[0];
+			dc_voltage_3v3 = sums[0];
+		} else {
+			dc_voltage_3v3 = (dc_voltage_3v3_prev + dc_voltage_3v3_prev + dc_voltage_3v3_prev + sums[0]) >> 2;
+			dc_voltage_3v3_prev = dc_voltage_3v3;
+		}
 
 		err_code = nrf_drv_saadc_buffer_convert(p_event->data.done.p_buffer, ADC_CHANNELS * ADC_SAMPLES_PER_CHANNEL);
 		APP_ERROR_CHECK(err_code);
@@ -173,7 +189,16 @@ static void internal_temperature_timeout_handler(void *p_context)
 
 	NRF_TEMP->TASKS_STOP = 1;
 
-	set_sensor_value('t', temp, false);
+	temp = temp << 2;
+
+	if (internal_temp_prev == 0x7FFFFFFF) {
+		internal_temp_prev = temp;
+	} else {
+		temp = (internal_temp_prev + internal_temp_prev + internal_temp_prev + temp) >> 2;
+		internal_temp_prev = temp;
+
+		set_sensor_value('t', temp >> 2, false);
+	}
 }
 
 static void hdc1080_measurement_delay_timeout_handler(void *p_context)
